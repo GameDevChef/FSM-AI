@@ -6,84 +6,143 @@ using UnityEngine.AI;
 
 public class EnemyAI : MonoBehaviour {
 
-    [Header("Referances")]
+    [Header("References")]
+
     public Transform Target;
+
     public Transform TargetHead;
-    private NavMeshAgent m_agent;
-    Transform m_transform;
+
     public Transform EyesTransform;
+
     AIDirector aiDirector;
+
+    Transform m_transform;
+
     SkinnedMeshRenderer m_renderer;
+
     EnemyAnimations m_enemyAnim;
 
+    NavMeshAgent m_agent;
+
     [Header("Materials")]
-    public Material ChaseMaterial;
-    public Material CoverMaterial;
-    public Material PatrolMaterial;
-    public Material InRangeMaterial;
-    public Material SearchMaterial;
+
+    [SerializeField]
+    Material m_chaseMaterial;
+
+    [SerializeField]
+    Material m_coverMaterial;
+
+    [SerializeField]
+    Material m_patrolMaterial;
+
+    [SerializeField]
+    Material m_inRangeMateril;
+
+    [SerializeField]
+    Material m_searchMaterial;
 
     [Header("Waypoints and Covers")]
-    public List<Waypoint> m_waypointList;    
-    public float MaxDistanceToCover;
-    Cover m_currentCover;
+
+    [SerializeField]
+    List<Waypoint> m_waypointList;  
+
+    [SerializeField]  
+    float m_maxDistanceToCover;
+
     int m_wayPointIndex;
+
     float m_currentWaitTime;
 
+    Cover m_currentCover;
+
     [Header("Search")]
-    public Vector2 SearchCountRange;  
+
+    [SerializeField]
+    public Vector2 m_searchCountRange; 
+     
     int m_searchCount;
+
     int m_currentSearchCount;
 
-    public Vector2 SearchPointWaitRange;
-    float m_SearchPointWaitTime;
+    [SerializeField]
+    Vector2 m_searchPointWaitRange;
+
+    float m_searchPointWaitTime;
+
     float m_currentSearchPointWaitTime;
 
     public Vector2 XZOffsetRange;
-    Vector3 m_searchPosition;
-    
 
-    [Header("Angle")]
-    public float ViewAngle;
+    Vector3 m_searchPosition; 
+
+    [Header("Angle Check")]
+
+    [SerializeField]
+    public float m_viewAngle;
 
     Vector3 m_direction;
+
     Vector3 m_rotationDirection;
+
     float m_currentAngle;   
+
     bool m_isInAngle;
 
-    [Header("Distance")]
-    public float ViewDistance;
-    public float StoppingDistance;
-    bool m_isInRange;
-    float m_currentViewDistance;
-
-    [Header("Speed")]
-    public float WalkSpeed;
-    public float RunSpeed;
-
-    [Header("Obstruction")]
     bool m_isNotObstructed;
 
+    [Header("Distance Check")]
+
+    [SerializeField]
+    public float m_viewDistance;
+
+    [SerializeField]
+    public float m_stoppingDistance;
+
+    bool m_isInRange;
+
+    float m_currentViewDistance;
+
+    [Header("Speeds")]
+
+    [SerializeField]
+    public float m_walkSpeed;
+
+    [SerializeField]
+    public float m_runSpeed;
+
     [Header("Delegates rates")]
-    public float LateFrameTime;
-    public float MidFrameTime;
+
+    [SerializeField]
+    float m_lateFrameTime;
+
+    [SerializeField]
+    public float m_midFrameTime;
+
     float m_lateFrameCurrentTime;
+
     float m_midFrameCurrentTime;
 
     public delegate void LateFrame();
     LateFrame m_lateFrame;
+
     public delegate void MidFrame();
     LateFrame m_midFrame;
+
     public delegate void EveryFrame();
     LateFrame m_everyFrame;
 
     Vector3 m_lastKnownPosition;
 
     AI_STATE m_currentAIstate;
+
     IN_VIEW_SUB_STATE m_currentInViewSubState;
 
+    void Awake()
+    {
+        GetReferences();
+    }
 
-    private void Awake()
+    void GetReferences()
     {
         m_transform = GetComponent<Transform>();
         m_agent = GetComponent<NavMeshAgent>();
@@ -91,20 +150,20 @@ public class EnemyAI : MonoBehaviour {
         m_enemyAnim = GetComponent<EnemyAnimations>();
     }
 
-    private void Start()
+    void Start()
     {
         aiDirector = AIDirector.Instance;
         ChangeState(AI_STATE.PATROL);
     }
 
-    private void Update()
+    void Update()
     {
         MonitorStates();
 
         m_lateFrameCurrentTime += Time.deltaTime;
         m_midFrameCurrentTime += Time.deltaTime;
 
-        if(m_lateFrameCurrentTime >= LateFrameTime)
+        if(m_lateFrameCurrentTime >= m_lateFrameTime)
         {
             m_lateFrameCurrentTime = 0f;
             if (m_lateFrame != null)
@@ -112,7 +171,7 @@ public class EnemyAI : MonoBehaviour {
                 m_lateFrame();
             }
         }
-        if (m_midFrameCurrentTime >= MidFrameTime)
+        if (m_midFrameCurrentTime >= m_midFrameTime)
         {
             m_midFrameCurrentTime = 0f;
             if (m_midFrame != null)
@@ -123,11 +182,10 @@ public class EnemyAI : MonoBehaviour {
         if (m_everyFrame != null)
         {
             m_everyFrame();
-        }
-           
+        }         
     }
 
-    private void MonitorStates()
+    void MonitorStates()
     {
         switch (m_currentAIstate)
         {
@@ -173,33 +231,34 @@ public class EnemyAI : MonoBehaviour {
         m_agent.updateRotation = true;
         m_currentWaitTime = 0f;
         m_enemyAnim.SetAlertBool(false);
-
+        if (m_currentCover != null)
+            m_currentCover.isOcupied = false;
         switch (_targetState)
         {
             case AI_STATE.IN_SEARCH:
-                m_renderer.material = SearchMaterial;
+                m_renderer.material = m_searchMaterial;
                 m_currentInViewSubState = IN_VIEW_SUB_STATE.NONE;
                 SetStartSearchValues();
                 m_midFrame = Sight;
                 m_midFrame += Search;
                 m_everyFrame += PlayNormalAnimations;
-                m_agent.speed = RunSpeed;
+                m_agent.speed = m_runSpeed;
                 break;
 
             case AI_STATE.PATROL:
-                m_renderer.material = PatrolMaterial;
+                m_renderer.material = m_patrolMaterial;
                 m_currentInViewSubState = IN_VIEW_SUB_STATE.NONE;
                 MoveToPosition(m_waypointList[m_wayPointIndex].WaypointTransform.position);
-                m_agent.speed = WalkSpeed;
+                m_agent.speed = m_walkSpeed;
                 m_lateFrame = PartolLateBehaviors;
                 m_everyFrame += PlayNormalAnimations;
                 break;
 
             case AI_STATE.IN_RANGE:
-                m_renderer.material = InRangeMaterial;
+                m_renderer.material = m_inRangeMateril;
                 m_currentInViewSubState = IN_VIEW_SUB_STATE.NONE;
                 MoveToPosition(m_waypointList[m_wayPointIndex].WaypointTransform.position);
-                m_agent.speed = WalkSpeed;
+                m_agent.speed = m_walkSpeed;
                 m_midFrame = InRangeMidBehaviors;
                 m_everyFrame += PlayNormalAnimations;
                 break;
@@ -226,9 +285,10 @@ public class EnemyAI : MonoBehaviour {
                 break;
 
             case IN_VIEW_SUB_STATE.CHASE:
+                m_renderer.material = m_chaseMaterial;
                 m_agent.stoppingDistance = 8f;
                 m_agent.updateRotation = true;
-                m_agent.speed = RunSpeed;
+                m_agent.speed = m_runSpeed;
                 m_lastKnownPosition = Target.position;
                 MoveToPosition(m_lastKnownPosition);
                 m_midFrame += Chase;
@@ -236,9 +296,11 @@ public class EnemyAI : MonoBehaviour {
                 break;
 
             case IN_VIEW_SUB_STATE.GET_COVER:
+                m_renderer.material = m_coverMaterial;
+                m_currentCover.isOcupied = true;
                 m_agent.stoppingDistance = .5f;
                 m_agent.updateRotation = false;
-                m_agent.speed = RunSpeed;
+                m_agent.speed = m_runSpeed;
                 m_lastKnownPosition = Target.position;
                 MoveToPosition(m_currentCover.coverTransform.position);
                 m_midFrame += GoToCover;
@@ -248,7 +310,8 @@ public class EnemyAI : MonoBehaviour {
                 break;
 
             case IN_VIEW_SUB_STATE.IN_COVER:
-               // m_agent.speed = 0f;
+                // m_agent.speed = 0f;             
+                
                 m_agent.updateRotation = false;
                 m_midFrame += InCover;
                 m_everyFrame += PlayAlertAnimations;
@@ -260,12 +323,11 @@ public class EnemyAI : MonoBehaviour {
         m_currentInViewSubState = _targetState;
     }
 
-    //Search
     void SetStartSearchValues()
     {
         m_currentSearchCount = 0;
         m_searchPosition = -Vector3.one;
-        m_searchCount = Mathf.RoundToInt(UnityEngine.Random.Range(SearchCountRange.x, SearchCountRange.y));
+        m_searchCount = Mathf.RoundToInt(UnityEngine.Random.Range(m_searchCountRange.x, m_searchCountRange.y));
         
     }
 
@@ -273,7 +335,7 @@ public class EnemyAI : MonoBehaviour {
     {
         
         m_currentSearchPointWaitTime = 0f;
-        m_SearchPointWaitTime = Mathf.RoundToInt(UnityEngine.Random.Range(SearchPointWaitRange.x, SearchPointWaitRange.y));
+        m_searchPointWaitTime = Mathf.RoundToInt(UnityEngine.Random.Range(m_searchPointWaitRange.x, m_searchPointWaitRange.y));
         NavMeshHit hit;
         if (NavMesh.SamplePosition(m_lastKnownPosition, out hit, 3f, NavMesh.AllAreas))
         {
@@ -305,8 +367,8 @@ public class EnemyAI : MonoBehaviour {
       
         if(distance < 2.5f)
         {
-            m_currentSearchPointWaitTime += MidFrameTime;
-            if(m_currentSearchPointWaitTime > m_SearchPointWaitTime)
+            m_currentSearchPointWaitTime += m_midFrameTime;
+            if(m_currentSearchPointWaitTime > m_searchPointWaitTime)
             {
                 SetSearchPosition();
                 m_currentSearchCount++;
@@ -325,7 +387,7 @@ public class EnemyAI : MonoBehaviour {
 
         if(distanceToWaypoint <= 2)
         {
-            m_currentWaitTime += LateFrameTime;
+            m_currentWaitTime += m_lateFrameTime;
             if(m_currentWaitTime >= waypoint.WaitTime)
             {
                 m_currentWaitTime = 0f;
@@ -343,15 +405,15 @@ public class EnemyAI : MonoBehaviour {
     {
         if(m_currentViewDistance < 10f)
         {
-            m_renderer.material = ChaseMaterial;
+           
             ChangeInViewBehaviors(IN_VIEW_SUB_STATE.CHASE);
             return;
         }
 
-        m_currentCover = aiDirector.GetClosestCover(m_transform.position, MaxDistanceToCover);
+        m_currentCover = aiDirector.GetClosestCover(m_transform.position, m_maxDistanceToCover);
         if (m_currentCover == null)
         {
-            m_renderer.material = ChaseMaterial;
+          
             ChangeInViewBehaviors(IN_VIEW_SUB_STATE.CHASE);
             return;
         }
@@ -359,11 +421,12 @@ public class EnemyAI : MonoBehaviour {
         float angle = Vector3.Angle(m_direction, m_currentCover.coverTransform.forward);
         if(angle > 75)
         {
-            m_renderer.material = ChaseMaterial;
+            
             ChangeInViewBehaviors(IN_VIEW_SUB_STATE.CHASE);
             return;
         }
-        m_renderer.material = CoverMaterial;
+        m_renderer.material = m_coverMaterial;
+        
         ChangeInViewBehaviors(IN_VIEW_SUB_STATE.GET_COVER);
     }
     
@@ -393,8 +456,10 @@ public class EnemyAI : MonoBehaviour {
       
         if (distanceToCover < 1f)
         {
-            ChangeState(AI_STATE.IN_VIEW);
-            ChangeInViewBehaviors(IN_VIEW_SUB_STATE.IN_COVER);
+            if (m_currentAIstate != AI_STATE.IN_VIEW)
+                ChangeState(AI_STATE.IN_VIEW);
+            if (m_currentInViewSubState != IN_VIEW_SUB_STATE.IN_COVER)
+                ChangeInViewBehaviors(IN_VIEW_SUB_STATE.IN_COVER);
         }
     }
 
@@ -412,7 +477,7 @@ public class EnemyAI : MonoBehaviour {
     void CheckDistance()
     {
         m_currentViewDistance = Vector3.Distance(Target.position, m_transform.position);
-        m_isInRange = m_currentViewDistance <= ViewDistance;
+        m_isInRange = m_currentViewDistance <= m_viewDistance;
     }
 
     void GetDirecton()
@@ -426,7 +491,7 @@ public class EnemyAI : MonoBehaviour {
     void CheckAngle()
     {     
         m_currentAngle = Vector3.Angle(m_transform.forward, m_rotationDirection);
-        m_isInAngle = m_currentAngle <= ViewAngle;
+        m_isInAngle = m_currentAngle <= m_viewAngle;
     }
 
     void CheckObstruction()
@@ -436,7 +501,7 @@ public class EnemyAI : MonoBehaviour {
             return;
         Debug.DrawRay(EyesTransform.position, m_direction, Color.white);
         RaycastHit hit;
-        if(Physics.Raycast(EyesTransform.position, m_direction, out hit, ViewDistance - 1f))
+        if(Physics.Raycast(EyesTransform.position, m_direction, out hit, m_viewDistance - 1f))
         {
             if (hit.collider.CompareTag("Player"))
             {
@@ -464,14 +529,13 @@ public class EnemyAI : MonoBehaviour {
 
     void MonitorPlayerPosition(Vector3 _position)
     {
-        if(Vector3.Distance(m_lastKnownPosition, _position) > 2f)
+        if(Vector3.Distance(m_lastKnownPosition, _position) > 10f)
         {
             MoveToPosition(_position);
             m_lastKnownPosition = _position;
         }
     }
 
-    //Animations
     void PlayNormalAnimations()
     {
         bool alert = m_currentAIstate == AI_STATE.IN_VIEW || m_currentAIstate == AI_STATE.IN_SEARCH;
